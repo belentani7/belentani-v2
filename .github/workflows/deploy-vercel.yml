@@ -1,19 +1,31 @@
 name: Deploy Vercel
+
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 24, cache: pnpm }
-      - run: pnpm install --no-frozen-lockfile
-      - run: pnpm run build
+
+      # This repository is a plain static site: no package.json, so there is
+      # nothing to install or build. The previous version of this workflow ran
+      # `pnpm install` / `pnpm run build` and failed on every push.
+      - name: Check Vercel credentials
+        id: creds
+        run: |
+          if [ -n "${{ secrets.VERCEL_TOKEN }}" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipping deploy - set VERCEL_TOKEN, VERCEL_ORG_ID and VERCEL_PROJECT_ID repository secrets to enable it."
+          fi
+
       - uses: amondnet/vercel-action@v25
-        if: github.ref == 'refs/heads/main'
+        if: steps.creds.outputs.ready == 'true'
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
